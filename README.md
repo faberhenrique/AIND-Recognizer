@@ -35,7 +35,7 @@ This will open the Jupyter Notebook software and notebook in your browser which 
 
 
 ### Additional Information
-##### Provided Raw Data
+##### Provided Raw Dataas   
 
 The data in the `asl_recognizer/data/` directory was derived from 
 the [RWTH-BOSTON-104 Database](http://www-i6.informatik.rwth-aachen.de/~dreuw/database-rwth-boston-104.php). 

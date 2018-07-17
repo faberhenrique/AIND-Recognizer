@@ -18,8 +18,31 @@ def recognize(models: dict, test_set: SinglesData):
            ['WORDGUESS0', 'WORDGUESS1', 'WORDGUESS2',...]
    """
     warnings.filterwarnings("ignore", category=DeprecationWarning)
+    '''
+    Passo a passo do algoritimo:
+    1) Recuperar toas as sequencas
+    2) Para cada palavra na sequencia => Testar em cada modelo existente
+    3) Armazenar palavaras testadas e valor do melhor modelo
+    '''
     probabilities = []
     guesses = []
+    #pegando todas as palavras de testes
+    allwords = test_set.get_all_Xlengths()
+    for idW in allwords:
+        wTestadas={}
+        listaWords, sizeListaW = allwords[idW]
+        for word,model in models.items():
+            #Try cathc para descarte
+            try:
+                score = model.score(listaWords,sizeListaW)
+                #Armazenando probabilidade no objeto
+                #key(word) - > value(prob)
+                wTestadas[word] = score
+            except:
+                #ocorreu um erro palavra testada deve ser descartada
+                wTestadas[word]=float('-Inf')
+                continue
+        probabilities.append(wTestadas)
+        guesses.append( max(wTestadas.keys(), key=(lambda k: wTestadas[k])))
     # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+    return probabilities, guesses

@@ -39,11 +39,13 @@ class ModelSelector(object):
             hmm_model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
                                     random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
             if self.verbose:
-                print("model created for {} with {} states".format(self.this_word, num_states))
+                print("model created for {} with {} states".format(
+                    self.this_word, num_states))
             return hmm_model
         except:
             if self.verbose:
-                print("failure on {} with {} states".format(self.this_word, num_states))
+                print("failure on {} with {} states".format(
+                    self.this_word, num_states))
             return None
 
 
@@ -74,10 +76,29 @@ class SelectorBIC(ModelSelector):
 
         :return: GaussianHMM object
         """
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        # warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        # BIC = −2 log L + p log N
+        # Loop para variar o numero de estados da Hmm
+        BestScore = float('Inf')
+        for nStates in range(self.min_n_components, self.max_n_components+1):
+            try:
+                model = GaussianHMM(n_components=nStates, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                l = model.score(self.X, self.lengths)
+            except Exception as e: 
+                print(e)
+                l=float('Inf')
+                pass
+
+            # P =  n*n + 2*n*d-1 (n= n_componenets and d=n_features) --> katie_tiwari
+            p = nStates*nStates+2*nStates*model.n_features-1
+            bic = -2 * l+p*nStates
+            if(bic < BestScore):
+                BestScore = bic
+                BestModel = model
+        return BestModel
 
 
 class SelectorDIC(ModelSelector):
@@ -94,7 +115,40 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        #     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
+        BestScore = -float('Inf')
+        M = len(self.hwords)
+        BestModel=None
+        for nStates in range(self.min_n_components, self.max_n_components+1):
+            try:
+                model = GaussianHMM(n_components=nStates, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                l = model.score(self.X, self.lengths)
+                   # Reiniciando a soma das probablidades
+                sump = 0
+                '''
+                SUM(log(P(X(all but i)) essa parte necessita da soma de todas as probabilidades do modelo. 
+                Esse valor é constante pois de baseia no didcionario, contudo, como o nº de componentes varia deve ser 
+                calculado a cada interaçaão do for de states. 
+                Dentro da variavel hwords esta armazenado o dicionario. 
+                '''
+                for word,(wordX, wordLengths) in self.hwords.items():
+                    if word == self.this_word:
+                        pword = model.score(wordX, wordLengths)
+                        sump += pword
+            except Exception as e: 
+                print(e,self.this_word)
+                l = -float('Inf')
+                pword=0
+                pass
+
+            term2 = (1/(M-1)) * (pword)
+            dic = l - term2
+            
+            if(dic > BestScore):
+                BestScore = dic
+                BestModel = model
+        return BestModel 
 
 
 class SelectorCV(ModelSelector):
@@ -106,4 +160,58 @@ class SelectorCV(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection using CV
-        raise NotImplementedError
+        # Saving instance as notebook
+        meanScore = 0
+        maxScore = -float('Inf')
+        aux = 0
+        # Loop para variar o numero de estados da Hmm
+        for nStates in range(self.min_n_components, self.max_n_components+1):
+            if len(self.sequences) > 1:
+                split_method = KFold(min(len(self.sequences), 3))
+
+                # Cross Validation para cada sequencia recuperando the fold indices e testes
+                for trainFold, testFold in split_method.split(self.sequences):
+                    # Adicionando Seq --> Similar ao alg genetico
+                    nTest, lengthTest = combine_sequences(
+                        testFold, self.sequences)
+                    nTrain, lengthTrain = combine_sequences(
+                        trainFold, self.sequences)
+                    # Calculando Model
+                    #model = self.base_model(nStates).fit(nTrain, lengthTrain)
+                    try:
+                        model = GaussianHMM(n_components=nStates, covariance_type="diag", n_iter=1000,
+                                            random_state=self.random_state, verbose=False).fit(nTrain, lengthTrain)
+                        meanScore = meanScore+model.score(nTest, lengthTest)
+                    except:
+                        pass
+                    aux += 1
+                if maxScore < (meanScore/aux):
+                    maxScore = meanScore/aux
+                    meanScore = 0
+                    aux = 0
+                    bestModel = model
+                else:
+                    meanScore = 0
+                    aux = 0
+            else:
+                    # Loop para variar o numero de estados da Hmm
+                for nStates in range(self.min_n_components, self.max_n_components+1):
+                    try:
+                        model= GaussianHMM(n_components=nStates, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                        meanScore = meanScore+model.score(self.X, self.lengths)
+                    except:
+                        pass
+                    aux += 1
+                    if maxScore < (meanScore/aux):
+                        maxScore = meanScore/aux
+                        meanScore = 0
+                        aux = 0
+                        bestModel = model
+                    else:
+                        meanScore = 0
+                        aux = 0
+       # print('\nbest model {}, best model number of components {}'.format(
+        #    bestModel, bestModel.n_components))
+
+        return bestModel
